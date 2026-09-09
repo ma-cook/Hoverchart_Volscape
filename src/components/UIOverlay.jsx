@@ -1511,7 +1511,11 @@ const UIOverlay = ({
   };
 
   if (!isAuthReady) {
-    return <div className="ui-overlay">Initializing...</div>;
+    return (
+      <div className="ui-stack">
+        <div className="ui-overlay">Initializing...</div>
+      </div>
+    );
   }
 
   return (
@@ -2060,7 +2064,27 @@ const UIOverlay = ({
           )}
         </div>
       </div>
-      <div className="ui-overlay" onClick={(e) => e.stopPropagation()}>
+      <div className="ui-stack" onClick={(e) => e.stopPropagation()}>
+        {/* In trial mode a standalone login button sits above the tools panel */}
+        {trialMode && !user && (
+          <div className="login-tooltip-row">
+            {loginTooltipVisible && (
+              <>
+                <div className="login-tooltip">
+                  Log in to save your space and unlock chat.
+                  <button className="login-tooltip-close" onClick={() => setLoginTooltipVisible(false)} title="Close">
+                    ✕
+                  </button>
+                </div>
+                <span className="login-tooltip-line" />
+              </>
+            )}
+            <button onClick={onLogin} className="login-button" title="Login">
+              login
+            </button>
+          </div>
+        )}
+        <div className="ui-overlay">
         {isLoading ? (
           <div>Loading...</div>
         ) : !user && !trialMode && showLoginButton ? (
@@ -2071,25 +2095,6 @@ const UIOverlay = ({
           </div>
         ) : (user || trialMode) ? (
           <>
-            {/* In trial mode, show a standalone login button separate from the tools menu */}
-            {trialMode && !user && (
-              <div className="login-tooltip-row">
-                {loginTooltipVisible && (
-                  <>
-                    <div className="login-tooltip">
-                      Log in to save your space and unlock chat.
-                      <button className="login-tooltip-close" onClick={() => setLoginTooltipVisible(false)} title="Close">
-                        ✕
-                      </button>
-                    </div>
-                    <span className="login-tooltip-line" />
-                  </>
-                )}
-                <button onClick={onLogin} className="login-button" title="Login">
-                  login
-                </button>
-              </div>
-            )}
             <div className="tools-container">
               <button
                 className="shape-button"
@@ -2147,8 +2152,9 @@ const UIOverlay = ({
             </div>
           </>
         ) : null}
+        </div>
 
-        {/* Comms container - sits below tools-container inside the right panel; chat icon shows greyed-out for non-logged-in users */}
+        {/* Comms container - sits below the tools panel; chat icon shows greyed-out for non-logged-in users */}
         {(currentSpaceId || (trialMode && !user)) && (
           <div className="coms-container">
             <div
