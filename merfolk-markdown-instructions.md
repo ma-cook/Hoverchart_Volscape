@@ -8,6 +8,7 @@ Merfolk is embedded inside markdown files within ` ```merfolk ` fenced code bloc
 
 ---
 
+
 ## Diagram Declaration
 
 Optionally declare a diagram with a title at the top of the Merfolk block:
