@@ -218,12 +218,17 @@ async function associateCodeWithScene(codeBlocks, spaceId, user) {
 }
 
 
-const SPACE_CHAT_MIN_WIDTH = 240;
-const SPACE_CHAT_MIN_HEIGHT = 200;
-const SPACE_CHAT_DEFAULT_WIDTH = 300;
-const SPACE_CHAT_DEFAULT_HEIGHT = 360;
-const SPACE_CHAT_STACK_H_OFFSET = 84;
-const SPACE_CHAT_STACK_V_OFFSET = 22;
+export const SPACE_CHAT_MIN_WIDTH = 240;
+export const SPACE_CHAT_MIN_HEIGHT = 200;
+export const SPACE_CHAT_DEFAULT_WIDTH = 300;
+export const SPACE_CHAT_DEFAULT_HEIGHT = 360;
+export const SPACE_CHAT_GAP = 16;
+
+// Movable area for chat windows: clear of the top-left menu bar and the
+// left-side tools column, with a small inset from the right/bottom edges.
+export const CHAT_BOUNDS_LEFT = 88;
+export const CHAT_BOUNDS_TOP = 72;
+export const CHAT_BOUNDS_MARGIN = 16;
 
 const MAX_PERSISTED_MESSAGES = 50;
 
@@ -283,49 +288,101 @@ function persistWindowLlm(windowId, key, value) {
   } catch { /* ignore */ }
 }
 
-const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGenerated, onAddChat, windowId = 0, stackIndex = windowId }) => {
+const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGenerated, onAddChat, windowId = 0, layout, onLayoutChange }) => {
   const isPrimary = windowId === 0;
-  const stackBaseRight = 76 + (stackIndex * SPACE_CHAT_STACK_H_OFFSET);
 
   const [isExpanded, setIsExpanded] = useState(false);
-  const [chatSize, setChatSize] = useState({ width: SPACE_CHAT_DEFAULT_WIDTH, height: SPACE_CHAT_DEFAULT_HEIGHT });
-  const [userResized, setUserResized] = useState(false);
+  const [dragging, setDragging] = useState(null);
   const [resizing, setResizing] = useState(null);
 
+  const currentLayout =
+    layout && layout.x != null && layout.y != null
+      ? layout
+      : { x: CHAT_BOUNDS_LEFT, y: CHAT_BOUNDS_TOP, width: SPACE_CHAT_DEFAULT_WIDTH, height: SPACE_CHAT_DEFAULT_HEIGHT };
+  const currentLayoutRef = useRef(currentLayout);
+  currentLayoutRef.current = currentLayout;
+
   useEffect(() => {
-    if (!resizing) return;
+    if (!dragging) return;
     const handleMove = (e) => {
-      const dx = e.clientX - resizing.startX;
-      const dy = e.clientY - resizing.startY;
-      setChatSize((prev) => {
-        const next = { ...prev };
-        if (resizing.edge === 'right' || resizing.edge === 'corner') {
-          const newWidth = Math.max(SPACE_CHAT_MIN_WIDTH, resizing.startWidth + dx);
-          next.width = newWidth;
-          next.userRight = stackBaseRight - dx;
-        }
-        if (resizing.edge === 'bottom' || resizing.edge === 'corner') {
-          next.height = Math.max(SPACE_CHAT_MIN_HEIGHT, resizing.startHeight + dy);
-        }
-        return next;
-      });
+      const cl = currentLayoutRef.current;
+      const dx = e.clientX - dragging.startX;
+      const dy = e.clientY - dragging.startY;
+      const minX = CHAT_BOUNDS_LEFT;
+      const minY = CHAT_BOUNDS_TOP;
+      const maxX = Math.max(minX, window.innerWidth - CHAT_BOUNDS_MARGIN - cl.width);
+      const maxY = Math.max(minY, window.innerHeight - CHAT_BOUNDS_MARGIN - cl.height);
+      if (onLayoutChange) {
+        onLayoutChange({
+          ...cl,
+          x: Math.min(maxX, Math.max(minX, dragging.startLeft + dx)),
+          y: Math.min(maxY, Math.max(minY, dragging.startTop + dy)),
+        });
+      }
     };
-    const handleUp = () => {
-      setResizing(null);
-      setUserResized(true);
-    };
+    const handleUp = () => setDragging(null);
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseup', handleUp);
     return () => {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
     };
-  }, [resizing, stackBaseRight]);
+  }, [dragging, onLayoutChange]);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const handleMove = (e) => {
+      const cl = currentLayoutRef.current;
+      const dx = e.clientX - resizing.startX;
+      const dy = e.clientY - resizing.startY;
+      const next = { ...cl };
+      const maxW = Math.max(SPACE_CHAT_MIN_WIDTH, window.innerWidth - CHAT_BOUNDS_MARGIN - cl.x);
+      const maxH = Math.max(SPACE_CHAT_MIN_HEIGHT, window.innerHeight - CHAT_BOUNDS_MARGIN - cl.y);
+      if (resizing.edge === 'right' || resizing.edge === 'corner') {
+        next.width = Math.min(maxW, Math.max(SPACE_CHAT_MIN_WIDTH, resizing.startWidth + dx));
+      }
+      if (resizing.edge === 'left') {
+        const maxNewX = resizing.startLeft + resizing.startWidth - SPACE_CHAT_MIN_WIDTH;
+        const newX = Math.min(maxNewX, Math.max(CHAT_BOUNDS_LEFT, resizing.startLeft + dx));
+        next.x = newX;
+        next.width = resizing.startLeft + resizing.startWidth - newX;
+      }
+      if (resizing.edge === 'bottom' || resizing.edge === 'corner') {
+        next.height = Math.min(maxH, Math.max(SPACE_CHAT_MIN_HEIGHT, resizing.startHeight + dy));
+      }
+      if (onLayoutChange) onLayoutChange(next);
+    };
+    const handleUp = () => setResizing(null);
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+  }, [resizing, onLayoutChange]);
 
   const handleResizeStart = (edge, e) => {
     e.preventDefault();
     e.stopPropagation();
-    setResizing({ edge, startX: e.clientX, startY: e.clientY, startWidth: chatSize.width, startHeight: chatSize.height });
+    setResizing({
+      edge,
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidth: currentLayout.width,
+      startHeight: currentLayout.height,
+      startLeft: currentLayout.x,
+    });
+  };
+
+  const handleDragStart = (e) => {
+    if (e.target.closest('button')) return;
+    e.preventDefault();
+    setDragging({
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: currentLayout.x,
+      startTop: currentLayout.y,
+    });
   };
 
   const [messages, setMessages] = useState([]);
@@ -1435,13 +1492,13 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
       className={`space-chat-window${isExpanded ? ' expanded' : ''}`}
       onClick={(e) => e.stopPropagation()}
       style={isExpanded ? undefined : {
-        width: chatSize.width,
-        height: chatSize.height,
-        right: userResized && chatSize.userRight ? chatSize.userRight : stackBaseRight,
-        top: `calc(50% + ${stackIndex * SPACE_CHAT_STACK_V_OFFSET}px)`,
+        width: currentLayout.width,
+        height: currentLayout.height,
+        left: currentLayout.x,
+        top: currentLayout.y,
       }}
     >
-      <div className="space-chat-header">
+      <div className="space-chat-header" onMouseDown={handleDragStart}>
         <div className="space-chat-mode-toggle">
           <button
             className={`space-chat-mode-btn ${chatMode === 'group' ? 'active' : ''}`}
@@ -1514,6 +1571,7 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
 
       {!isExpanded && (
         <>
+          <div className="space-chat-resize-handle space-chat-resize-left" onMouseDown={(e) => handleResizeStart('left', e)} />
           <div className="space-chat-resize-handle space-chat-resize-right" onMouseDown={(e) => handleResizeStart('right', e)} />
           <div className="space-chat-resize-handle space-chat-resize-bottom" onMouseDown={(e) => handleResizeStart('bottom', e)} />
           <div className="space-chat-resize-handle space-chat-resize-corner" onMouseDown={(e) => handleResizeStart('corner', e)} />

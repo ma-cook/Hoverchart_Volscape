@@ -31,7 +31,14 @@ import {
 } from '../services/runtimeScanService';
 import SpacePresenceAvatars from './SpacePresenceAvatars';
 import ObjectSearch from './ObjectSearch';
-import SpaceChat from './SpaceChat';
+import SpaceChat, { SPACE_CHAT_DEFAULT_WIDTH, SPACE_CHAT_DEFAULT_HEIGHT, SPACE_CHAT_GAP, CHAT_BOUNDS_LEFT, CHAT_BOUNDS_TOP, CHAT_BOUNDS_MARGIN } from './SpaceChat';
+
+const defaultChatLayout = {
+  x: CHAT_BOUNDS_LEFT,
+  y: CHAT_BOUNDS_TOP,
+  width: SPACE_CHAT_DEFAULT_WIDTH,
+  height: SPACE_CHAT_DEFAULT_HEIGHT,
+};
 import CodeWorkspace from './CodeWorkspace';
 import PendingChangesPanel from './PendingChangesPanel';
 import RepoAnalysisOverlay from './RepoAnalysisOverlay';
@@ -482,13 +489,38 @@ const UIOverlay = ({
     }
   }, [trialMode, user]);
   const [chatWindows, setChatWindows] = useState([]);
+  const [chatWindowLayouts, setChatWindowLayouts] = useState({});
   const nextChatWindowIdRef = useRef(1);
-  const handleAddChat = useCallback(() => {
-    const id = nextChatWindowIdRef.current++;
-    setChatWindows((prev) => [...prev, id]);
+  const handleLayoutChange = useCallback((id, nextLayout) => {
+    setChatWindowLayouts((prev) => ({ ...prev, [id]: nextLayout }));
   }, []);
+  const handleAddChat = useCallback((fromWindowId = 0) => {
+    const id = nextChatWindowIdRef.current++;
+    const prev = chatWindowLayouts[fromWindowId] || defaultChatLayout;
+    let x = prev.x + prev.width + SPACE_CHAT_GAP;
+    let y = prev.y;
+    if (x + SPACE_CHAT_DEFAULT_WIDTH > window.innerWidth - CHAT_BOUNDS_MARGIN) {
+      x = CHAT_BOUNDS_LEFT;
+      y = prev.y + prev.height + SPACE_CHAT_GAP;
+    }
+    const maxY = window.innerHeight - CHAT_BOUNDS_MARGIN - SPACE_CHAT_DEFAULT_HEIGHT;
+    if (y > maxY) y = maxY;
+    const layout = {
+      x,
+      y: Math.max(CHAT_BOUNDS_TOP, y),
+      width: SPACE_CHAT_DEFAULT_WIDTH,
+      height: SPACE_CHAT_DEFAULT_HEIGHT,
+    };
+    setChatWindowLayouts((prevLayouts) => ({ ...prevLayouts, [id]: layout }));
+    setChatWindows((prev) => [...prev, id]);
+  }, [chatWindowLayouts]);
   const handleCloseChat = useCallback((id) => {
     setChatWindows((prev) => prev.filter((w) => w !== id));
+    setChatWindowLayouts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [recordingFormatOpen, setRecordingFormatOpen] = useState(false);
@@ -1512,7 +1544,7 @@ const UIOverlay = ({
   if (!isAuthReady) {
     return (
       <div className="ui-stack">
-        <div className="ui-overlay">Initializing...</div>
+        <div className="ui-overlay ui-panel">Initializing...</div>
       </div>
     );
   }
@@ -2085,7 +2117,7 @@ const UIOverlay = ({
         )}
         <div className="ui-overlay">
         {isLoading ? (
-          <div>Loading...</div>
+          <div className="ui-panel">Loading...</div>
         ) : !user && !trialMode && showLoginButton ? (
           <div className="login-container">
             <button onClick={onLogin} className="login-button">
@@ -2194,21 +2226,23 @@ const UIOverlay = ({
         )}
       </div>
 
-      {/* Group chat window - pops out to the left of the right panel */}
-      {!trialMode && <SpaceChat spaceId={currentSpaceId} user={user} isOpen={chatOpen} onClose={() => setChatOpen(false)} onCreateObject={onCreateObject} onDiagramGenerated={handleChatDiagramGenerated} onAddChat={handleAddChat} />}
+      {/* Group chat window - opens at the top-left of the chat area */}
+      {!trialMode && <SpaceChat spaceId={currentSpaceId} user={user} isOpen={chatOpen} onClose={() => setChatOpen(false)} onCreateObject={onCreateObject} onDiagramGenerated={handleChatDiagramGenerated} onAddChat={() => handleAddChat(0)} layout={chatWindowLayouts[0] || defaultChatLayout} onLayoutChange={(next) => handleLayoutChange(0, next)} />}
 
       {/* Extra chat windows - each is an independent LLM chat */}
       {!trialMode && chatWindows.map((id) => (
         <SpaceChat
           key={id}
           windowId={id}
-          stackIndex={chatWindows.indexOf(id)}
           spaceId={currentSpaceId}
           user={user}
           isOpen
           onClose={() => handleCloseChat(id)}
           onCreateObject={onCreateObject}
           onDiagramGenerated={handleChatDiagramGenerated}
+          onAddChat={() => handleAddChat(id)}
+          layout={chatWindowLayouts[id] || defaultChatLayout}
+          onLayoutChange={(next) => handleLayoutChange(id, next)}
         />
       ))}
 
