@@ -471,15 +471,14 @@ const UIOverlay = ({
     }
   }, [user]);
 
-  // First-visit login tooltip: show once next to the trial-mode login button
-  // for brand-new visitors who have never logged in before.
+  // First-visit login tooltip: show next to the trial-mode login button only
+// for users who have never logged in before.
   useEffect(() => {
-    if (!trialMode || user) return;
     const hasLoggedInBefore = safeGetItem('hoverchart:hasLoggedInBefore') === '1';
-    const tooltipSeen = safeGetItem('hoverchart:loginTooltipSeen') === '1';
-    if (!hasLoggedInBefore && !tooltipSeen) {
+    if (trialMode && !user && !hasLoggedInBefore) {
       setLoginTooltipVisible(true);
-      try { safeSetItem('hoverchart:loginTooltipSeen', '1'); } catch { /* ignore */ }
+    } else {
+      setLoginTooltipVisible(false);
     }
   }, [trialMode, user]);
   const [chatWindows, setChatWindows] = useState([]);
@@ -2068,20 +2067,20 @@ const UIOverlay = ({
         {/* In trial mode a standalone login button sits above the tools panel */}
         {trialMode && !user && (
           <div className="login-tooltip-row">
+            <button onClick={onLogin} className="login-button" title="Login">
+              login
+            </button>
             {loginTooltipVisible && (
               <>
+                <span className="login-tooltip-line" />
                 <div className="login-tooltip">
                   Log in to save your space and unlock chat.
                   <button className="login-tooltip-close" onClick={() => setLoginTooltipVisible(false)} title="Close">
                     ✕
                   </button>
                 </div>
-                <span className="login-tooltip-line" />
               </>
             )}
-            <button onClick={onLogin} className="login-button" title="Login">
-              login
-            </button>
           </div>
         )}
         <div className="ui-overlay">
@@ -2164,13 +2163,8 @@ const UIOverlay = ({
             >
               {chatLocked && chatTooltipVisible && (
                 <>
-                  <div className="chat-tooltip">
-                    login to access the chat window
-                    <button className="chat-tooltip-close" onClick={() => setChatTooltipVisible(false)} title="Close">
-                      ✕
-                    </button>
-                  </div>
                   <span className="chat-tooltip-line" />
+                  <div className="chat-tooltip">login to access the chat window</div>
                 </>
               )}
               <button
