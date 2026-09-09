@@ -2153,9 +2153,9 @@ const UIOverlay = ({
 
       
       {/* Unified progress toast — bottom-right, handles scan, render, and data loading */}
-      {(scanProgress.isScanning || renderProgress || isInitialLoading || isCellsLoading) && (
+      {(scanProgress.isScanning || renderProgress || ((isInitialLoading || isCellsLoading) && objectCount > 0)) && (
         <div className="progress-toast">
-          {(isInitialLoading || isCellsLoading) && (
+          {((isInitialLoading || isCellsLoading) && objectCount > 0) && (
             <div className="progress-toast-row">
               <div className="progress-toast-label">
                 {isInitialLoading

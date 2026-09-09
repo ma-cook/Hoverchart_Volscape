@@ -549,6 +549,21 @@ const existingIdsRef = useRef(new Set());
   
   // Subscribe to spatial objects changes - supports anonymous access to public spaces
   useEffect(() => {
+    // Adaptive loading complete detection — armed BEFORE the guards below so
+    // the initial-loading state always resolves, even for spaces that have no
+    // cells/objects to load (never-accessed or empty spaces) or that are still
+    // waiting on spatial init / owner lookup.
+    let connectionSubscriptionTimeoutId = null;
+    const totalCells = loadedCells?.length || 0;
+    const connectionTimeout = Math.max(2000, totalCells * 500); // 500ms per cell, minimum 2 seconds
+
+    connectionSubscriptionTimeoutId = setTimeout(() => {
+      setGlobalInitialLoading(false);
+      // Safety fallback: clear object loading state for empty spaces or when
+      // the Firebase subscription didn't trigger scheduleLoadingComplete
+      setIsInitialLoading(false);
+    }, connectionTimeout);
+
     if (!canViewSpace) {
       return;
     }
@@ -618,6 +633,13 @@ const existingIdsRef = useRef(new Set());
           // doesn't re-flag every loaded object as "new" (which would hold
           // the poll at its fastest cadence during the warm-up).
           seedObjectsCache(effectiveSpaceId, initialObjects);
+        } else {
+          // Nothing in the currently loaded cells — mark loading complete so
+          // the UI never shows an endless "Loading objects…" for a space
+          // that has nothing to load. Also unblock saves (the save gate in
+          // spatialObjectsService checks the global loading flag).
+          setIsInitialLoading(false);
+          setGlobalInitialLoading(false);
         }
       } catch (error) {
         console.error('Failed to fetch initial objects:', error);
@@ -626,21 +648,6 @@ const existingIdsRef = useRef(new Set());
 
     // Perform initial fetch before setting up subscriptions
     performInitialObjectFetch();
-
-    // Adaptive loading complete detection
-    let connectionSubscriptionTimeoutId = null;
-    // Timing variables tracked via refs
-
-    // Start a longer timeout for connection subscriptions (they take longer to set up)
-    const totalCells = loadedCells.length;
-    const connectionTimeout = Math.max(2000, totalCells * 500); // 500ms per cell, minimum 2 seconds
-
-    connectionSubscriptionTimeoutId = setTimeout(() => {
-      setGlobalInitialLoading(false);
-      // Safety fallback: clear object loading state for empty spaces or when
-      // the Firebase subscription didn't trigger scheduleLoadingComplete
-      setIsInitialLoading(false);
-    }, connectionTimeout);
 
     // Separate shorter timeout for object loading
     const scheduleLoadingComplete = () => {
