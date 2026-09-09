@@ -12,7 +12,7 @@ import { markdownDiagramService } from '../services/markdownDiagramService';
 import { populateContentStoreWorker } from '../services/zenService';
 import { saveRepoFileContents } from '../services/context/contentStorePersistence';
 import { saveDiagramDigest, rehydrateFromDigest } from '../services/graphPersistence';
-import { safeSetItem, safeRemoveItem } from '../utils/safeLocalStorage';
+import { safeSetItem, safeGetItem, safeRemoveItem } from '../utils/safeLocalStorage';
 import { processCsvFile } from '../services/csvDiagramService';
 import { setCellBoundariesVisible } from '../stores/uiOverlayStore';
 import { clearAllObjectCaches, cleanupSpatialObjectSubscriptions, deleteAllCellsInSpace } from '../services/spatialObjectsService';
@@ -459,6 +459,29 @@ const UIOverlay = ({
   }, [lastCommitSha, currentSpaceId]);
 
   const [chatOpen, setChatOpen] = useState(false);
+  const [loginTooltipVisible, setLoginTooltipVisible] = useState(false);
+  const [chatTooltipVisible, setChatTooltipVisible] = useState(false);
+  const chatLocked = !user;
+
+  // Remember that this user has logged in so the first-visit login tooltip
+  // never shows again for previously-logged-in users.
+  useEffect(() => {
+    if (user) {
+      try { safeSetItem('hoverchart:hasLoggedInBefore', '1'); } catch { /* ignore */ }
+    }
+  }, [user]);
+
+  // First-visit login tooltip: show once next to the trial-mode login button
+  // for brand-new visitors who have never logged in before.
+  useEffect(() => {
+    if (!trialMode || user) return;
+    const hasLoggedInBefore = safeGetItem('hoverchart:hasLoggedInBefore') === '1';
+    const tooltipSeen = safeGetItem('hoverchart:loginTooltipSeen') === '1';
+    if (!hasLoggedInBefore && !tooltipSeen) {
+      setLoginTooltipVisible(true);
+      try { safeSetItem('hoverchart:loginTooltipSeen', '1'); } catch { /* ignore */ }
+    }
+  }, [trialMode, user]);
   const [chatWindows, setChatWindows] = useState([]);
   const nextChatWindowIdRef = useRef(1);
   const handleAddChat = useCallback(() => {
@@ -2048,11 +2071,22 @@ const UIOverlay = ({
           </div>
         ) : (user || trialMode) ? (
           <>
-            {/* In trial mode, show a login button in the top right */}
+            {/* In trial mode, show a standalone login button separate from the tools menu */}
             {trialMode && !user && (
-              <div style={{ marginBottom: '8px' }}>
-                <button onClick={onLogin} className="login-button" style={{ fontSize: '12px', padding: '6px 12px' }}>
-                  Login with Google
+              <div className="login-tooltip-row">
+                {loginTooltipVisible && (
+                  <>
+                    <div className="login-tooltip">
+                      Log in to save your space and unlock chat.
+                      <button className="login-tooltip-close" onClick={() => setLoginTooltipVisible(false)} title="Close">
+                        ✕
+                      </button>
+                    </div>
+                    <span className="login-tooltip-line" />
+                  </>
+                )}
+                <button onClick={onLogin} className="login-button" title="Login">
+                  login
                 </button>
               </div>
             )}
@@ -2114,21 +2148,48 @@ const UIOverlay = ({
           </>
         ) : null}
 
-        {/* Comms container - sits below tools-container inside the right panel, hidden in trial mode */}
-        {currentSpaceId && !trialMode && (
+        {/* Comms container - sits below tools-container inside the right panel; chat icon shows greyed-out for non-logged-in users */}
+        {(currentSpaceId || (trialMode && !user)) && (
           <div className="coms-container">
-            <button
-              className="shape-button"
-              onClick={() => setChatOpen((prev) => !prev)}
-              title="Toggle Space Chat"
-              style={{
-                background: chatOpen ? 'rgba(74,144,217,0.2)' : undefined,
-                borderColor: chatOpen ? '#4a90d9' : undefined,
-                color: chatOpen ? '#4a90d9' : undefined,
-              }}
+            <div
+              className="chat-tooltip-row"
+              onMouseEnter={chatLocked ? () => setChatTooltipVisible(true) : undefined}
+              onMouseLeave={chatLocked ? () => setChatTooltipVisible(false) : undefined}
             >
-              💬
-            </button>
+              {chatLocked && chatTooltipVisible && (
+                <>
+                  <div className="chat-tooltip">
+                    login to access the chat window
+                    <button className="chat-tooltip-close" onClick={() => setChatTooltipVisible(false)} title="Close">
+                      ✕
+                    </button>
+                  </div>
+                  <span className="chat-tooltip-line" />
+                </>
+              )}
+              <button
+                className={`shape-button${chatLocked ? ' shape-button--locked' : ''}`}
+                onClick={() => {
+                  if (chatLocked) {
+                    setChatTooltipVisible((v) => !v);
+                    return;
+                  }
+                  setChatOpen((prev) => !prev);
+                }}
+                title={chatLocked ? 'login to access the chat window' : 'Toggle Space Chat'}
+                style={
+                  chatLocked
+                    ? undefined
+                    : {
+                        background: chatOpen ? 'rgba(74,144,217,0.2)' : undefined,
+                        borderColor: chatOpen ? '#4a90d9' : undefined,
+                        color: chatOpen ? '#4a90d9' : undefined,
+                      }
+                }
+              >
+                💬
+              </button>
+            </div>
           </div>
         )}
       </div>
