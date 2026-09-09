@@ -1151,6 +1151,26 @@ body {
   background: rgba(255,255,255,0.13);
 }
 
+.space-chat-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Locked (no API key) LLM input — clicks land on the row and open the
+   provider modal, so block pointer events on the disabled controls. */
+.space-chat-input-row--locked {
+  cursor: pointer;
+}
+
+.space-chat-input-row--locked .space-chat-input,
+.space-chat-input-row--locked .space-chat-send {
+  pointer-events: none;
+}
+
+.space-chat-input-row--locked .space-chat-input::placeholder {
+  color: rgba(255,255,255,0.55);
+}
+
 .space-chat-send {
   width: 32px;
   height: 32px;

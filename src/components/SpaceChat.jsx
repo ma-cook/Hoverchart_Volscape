@@ -449,6 +449,16 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
 
   const llmMessages = chatMode === 'plan' ? planMessages : codeMessages;
 
+  // Plan/code modes need an LLM provider API key before the user can send.
+  // Group mode is a real-time chat and never locked.
+  const llmLocked = chatMode !== 'group' && !windowLlm.apiKey;
+
+  // Hide the "create a 3D diagram" suggestion once the user has actually
+  // asked for a diagram in this plan conversation.
+  const planRequestedDiagram = planMessages.some(
+    (m) => m.role === 'user' && /diagram/i.test(m.content || '')
+  );
+
   useEffect(() => {
     if (!spaceId || !isOpen || chatMode !== 'group') return;
 
@@ -1691,9 +1701,17 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
               <div className="space-chat-empty">
                 {chatMode === 'plan' ? (
                   <>
-                    Ask me about software architecture or create a diagram.
-                    <br /><br />
-                    Try: &quot;Create a microservices e-commerce architecture&quot;
+                    {!githubConnected && (
+                      <>
+                        Click the Github button to login to Github and scan your code repositories.
+                        <br /><br />
+                      </>
+                    )}
+                    {!planRequestedDiagram && (
+                      <>
+                        {!githubConnected ? 'Or ' : ''}Give me requirements for your architecture to create a 3D diagram to your specifications.
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -1934,17 +1952,24 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
         </div>
       )}
 
-      <div className="space-chat-input-row">
+      <div
+        className={`space-chat-input-row${llmLocked ? ' space-chat-input-row--locked' : ''}`}
+        onClick={llmLocked ? () => setShowProviderModal(true) : undefined}
+        role={llmLocked ? 'button' : undefined}
+        aria-disabled={llmLocked || undefined}
+        title={llmLocked ? 'Connect to provider' : undefined}
+      >
         <textarea
           ref={textareaRef}
           className="space-chat-input"
           rows={1}
-          placeholder={getInputPlaceholder()}
+          placeholder={llmLocked ? 'connect to provider' : getInputPlaceholder()}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           maxLength={chatMode === 'group' ? 500 : 4000}
-          disabled={chatMode !== 'group' && streaming}
+          disabled={chatMode !== 'group' && (streaming || llmLocked)}
+          tabIndex={llmLocked ? -1 : undefined}
         />
         <button
           className="space-chat-send"
@@ -1953,7 +1978,7 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
               ? handleStop
               : (chatMode === 'group' ? handleSend : chatMode === 'plan' ? handlePlanSend : handleCodeSend)
           }
-          disabled={streaming ? false : (!input.trim() || (chatMode === 'group' ? sending : streaming))}
+          disabled={streaming ? false : (llmLocked || !input.trim() || (chatMode === 'group' ? sending : streaming))}
           title={streaming ? 'Stop' : getSendButtonLabel()}
         >
           {streaming ? '◼' : '➤'}
