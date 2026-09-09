@@ -1453,7 +1453,7 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
           </button>
         </div>
         <div className="space-chat-header-actions">
-          {chatMode === 'code' && (
+          {(chatMode === 'plan' || chatMode === 'code') && (
             <button
               className="space-chat-github-btn"
               onClick={() => setShowGithubPanel(v => !v)}
@@ -1574,7 +1574,7 @@ const SpaceChat = ({ spaceId, user, isOpen, onClose, onCreateObject, onDiagramGe
       )}
 
       {/* GitHub Panel */}
-      {showGithubPanel && chatMode === 'code' && (
+      {showGithubPanel && (chatMode === 'plan' || chatMode === 'code') && (
         <div className="space-chat-github-panel">
           {!githubConnected ? (
             <button className="github-login-button" onClick={handleGithubLogin}>
