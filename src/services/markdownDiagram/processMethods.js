@@ -191,7 +191,15 @@ export const processMethods = {
           connections: new Map(
             layout.rawConnections.map((c, i) => [
               `wc-${i}`,
-              { source: c.source, target: c.target, label: c.label, type: c.connectionType, visual: c.visual || null },
+              {
+                source: c.source,
+                target: c.target,
+                label: c.label,
+                type: c.connectionType,
+                visual: c.visual || null,
+                arrowStart: !!c.arrowStart,
+                arrowEnd: !!c.arrowEnd,
+              },
             ])
           ),
         },

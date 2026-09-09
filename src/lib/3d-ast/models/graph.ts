@@ -408,6 +408,7 @@ export class Graph {
       node.metadata = nodeData.metadata;
       node.children = [...nodeData.children];
       node.parents = [...nodeData.parents];
+      node.parent = nodeData.parent;
       graph.addNode(node);
     }
 
@@ -421,6 +422,8 @@ export class Graph {
       );
       connection.visual = connectionData.visual;
       connection.metadata = connectionData.metadata;
+      connection.arrowStart = connectionData.arrowStart === true;
+      connection.arrowEnd = connectionData.arrowEnd === true;
       if (connectionData.waypoints) {
         connection.setWaypoints(connectionData.waypoints);
       }

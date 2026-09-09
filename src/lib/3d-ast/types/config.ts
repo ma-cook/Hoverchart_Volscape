@@ -71,6 +71,9 @@ export const DEFAULT_CONFIG: Config = {
       interface: '#00BCD4',
       variable: '#FFEB3B',
       constant: '#795548',
+      person: '#FFC107',
+      boundary: '#E0E0E0',
+      junction: '#888888',
     },
     material: {
       metalness: 0.1,

@@ -98,7 +98,7 @@ function parseFlowPaths(content) {
     const name = match[1];
     const sequenceStr = match[2];
     const nodes = sequenceStr
-      .split(/\s*(?:-->|-.->|-\.->|===+>|--[^>]*>)\s*/)
+      .split(/\s*(?:<-->|<--|-->|-.->|-\.->|---|===+>|==|\*-->|\.\.>|--)\s*/)
       .map((n) => n.trim())
       .filter(Boolean);
     for (let i = 0; i < nodes.length - 1; i++) {
@@ -107,7 +107,7 @@ function parseFlowPaths(content) {
   }
 
   const taggedConnRegex =
-    /^[ \t]*(\w[\w-]*)[ \t]*(?:-->|-.->|-\.->|===+>|--[^>]*>)[ \t]*(\w[\w-]*)[ \t]*(?::\s*"[^"]*")?[ \t]*((?:#\w+[ \t]*)+)/gm;
+    /^[ \t]*(\w[\w-]*)[ \t]*(?:<-->|<--|-->|-.->|-\.->|===+>|==|\*-->|\.\.>|--[^>]*>|--)[ \t]*(\w[\w-]*)[ \t]*(?::\s*"[^"]*")?[ \t]*((?:#\w+[ \t]*)+)/gm;
   while ((match = taggedConnRegex.exec(merfolkContent)) !== null) {
     const srcId = match[1];
     const tgtId = match[2];
@@ -231,6 +231,7 @@ const workerApi = {
         nodePositions,
         nodeScales,
         processedNodes,
+        alignments: graph.metadata?.alignments || [],
       };
 
       const rootArray = Array.from(rootNodes);
@@ -247,6 +248,9 @@ const workerApi = {
 
       engine.positionGroupedNodes(context);
       engine.resolveCollisions(context);
+
+      // Honour `align row|column` directives after layout settles
+      engine.applyAlignments(context);
 
       // --- Post-layout: compress extreme positions logarithmically ---
       // Keeps all objects within a renderable volume while preserving
@@ -295,6 +299,8 @@ const workerApi = {
             label: c.label || '',
             connectionType: c.type || c.connectionType || '',
             visual: c.visual || null,
+            arrowStart: !!c.arrowStart,
+            arrowEnd: !!c.arrowEnd,
           }))
         : [];
 
@@ -320,6 +326,9 @@ const workerApi = {
             type: v.type,
             name: v.name,
             properties: v.properties || {},
+            visual: v.visual || null,
+            metadata: v.metadata || {},
+            parent: v.parent,
           },
         ]),
       });

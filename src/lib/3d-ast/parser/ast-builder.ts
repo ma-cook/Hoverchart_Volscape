@@ -1,7 +1,13 @@
 import { Graph } from '../models/graph';
 import { Node } from '../models/node';
 import { Connection } from '../models/connection';
-import { ParsedGraph, ParsedNode, ParsedConnection, ParsedFlowPath } from './mermaid-parser';
+import {
+  ParsedGraph,
+  ParsedNode,
+  ParsedConnection,
+  ParsedFlowPath,
+  StyleDirective,
+} from './mermaid-parser';
 import { Config, DEFAULT_CONFIG } from '../types/config';
 import { GeometryType } from '../types/geometry';
 
@@ -60,8 +66,19 @@ export class ASTBuilder {
       }
     }
 
+    // Apply explicit containment (`Node[...] in <parentId>`). Runs after
+    // applyNestedGrouping so explicit `in` membership is authoritative.
+    this.applyExplicitParents(graph, parsedGraph);
+
     // Apply nested grouping logic for functions inside components
     this.applyNestedGrouping(graph, nodeMap);
+
+    // Apply style / relstyle directives by node / connection type
+    this.applyStyles(graph, parsedGraph.styles);
+
+    // Carry alignment directives so the production layout pipeline can honour
+    // `align row|column` after positioning.
+    graph.metadata.alignments = parsedGraph.alignments || [];
 
     // Apply layout
     this.applyLayout(graph);
@@ -70,6 +87,120 @@ export class ASTBuilder {
     this.updateConnectionAnchors(graph);
 
     return graph;
+  }
+
+  /**
+   * Wire explicit `in <parentId>` membership into the graph hierarchy.
+   */
+  private applyExplicitParents(
+    graph: Graph,
+    parsedGraph: ParsedGraph
+  ): void {
+    for (const parsedNode of parsedGraph.nodes) {
+      if (!parsedNode.parentId) continue;
+      const child = graph.getNode(parsedNode.id);
+      const parent = graph.getNode(parsedNode.parentId);
+      if (!child || !parent) {
+        console.warn(
+          `[ASTBuilder] '${parsedNode.id} in <${parsedNode.parentId}>': parent or child not found`
+        );
+        continue;
+      }
+      // Detach from any previously inferred/nested parent so `in` wins.
+      if (child.parent && child.parent !== parsedNode.parentId) {
+        const oldParent = graph.getNode(child.parent);
+        oldParent?.removeChild(child.id);
+      }
+      child.setParent(parsedNode.parentId);
+      parent.addChild(child.id);
+      child.metadata.parentId = parsedNode.parentId;
+      parent.metadata.isContainer = true;
+    }
+  }
+
+  /**
+   * Apply targeted `style`/`relstyle` directives by node / connection type.
+   */
+  private applyStyles(
+    graph: Graph,
+    directives: StyleDirective[] | undefined
+  ): void {
+    if (!directives || directives.length === 0) return;
+
+    for (const directive of directives) {
+      if (directive.kind === 'node') {
+        const targets = directive.targets.map((t) => t.toLowerCase());
+        for (const node of graph.nodes.values()) {
+          if (targets.includes(node.type.toLowerCase())) {
+            this.applyNodeStyle(node, directive.properties);
+          }
+        }
+      } else {
+        const targets = directive.targets.map((t) => t.toLowerCase());
+        for (const conn of graph.connections.values()) {
+          if (targets.includes(conn.type.toLowerCase())) {
+            this.applyConnectionStyle(conn, directive.properties);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply a style directive's properties to a node's visual + transform.
+   */
+  private applyNodeStyle(
+    node: Node,
+    properties: Record<string, any>
+  ): void {
+    if (properties.color) {
+      node.visual.color = properties.color;
+    }
+    if (properties.opacity !== undefined) {
+      node.visual.opacity = parseFloat(properties.opacity);
+    }
+    if (properties.scale) {
+      const scale = this.parseScaleProp(properties.scale);
+      if (scale) node.setScale(scale);
+    }
+  }
+
+  /**
+   * Apply a relstyle directive's properties to a connection's visual.
+   */
+  private applyConnectionStyle(
+    connection: Connection,
+    properties: Record<string, any>
+  ): void {
+    if (properties.color) {
+      connection.visual.color = properties.color;
+    }
+    if (properties.opacity !== undefined) {
+      connection.visual.opacity = parseFloat(properties.opacity);
+    }
+    if (properties.lineStyle) {
+      connection.metadata.lineStyle = properties.lineStyle;
+    }
+  }
+
+  /**
+   * Parse a scale value that may be a number, "n[,n,n]", or [x,y,z] array.
+   */
+  private parseScaleProp(
+    scaleData: any
+  ): { x: number; y: number; z: number } | null {
+    if (Array.isArray(scaleData) && scaleData.length >= 1) {
+      const n = (v: any) => parseFloat(v) || 1;
+      return {
+        x: n(scaleData[0]),
+        y: n(scaleData[1] ?? scaleData[0]),
+        z: n(scaleData[2] ?? scaleData[0]),
+      };
+    }
+    if (typeof scaleData === 'string' || typeof scaleData === 'number') {
+      return this.parseScale(String(scaleData));
+    }
+    return null;
   }
 
   /**
@@ -167,6 +298,10 @@ export class ASTBuilder {
         connection.addFlowPath(fp);
       }
     }
+
+    // Per-end arrow decorations (`<--`, `-->`, `<-->`, ...)
+    connection.arrowStart = !!parsedConnection.arrowStart;
+    connection.arrowEnd = !!parsedConnection.arrowEnd;
 
     return connection;
   }

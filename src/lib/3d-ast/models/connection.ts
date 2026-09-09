@@ -23,6 +23,8 @@ export class Connection {
   public metadata: Record<string, any>;
   public waypoints: Position3D[];
   public flowPaths: string[]; // Flow path IDs this connection belongs to
+  public arrowStart: boolean = false; // Render an arrowhead at the source end
+  public arrowEnd: boolean = false; // Render an arrowhead at the target end
 
   constructor(
     id: string,

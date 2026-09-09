@@ -196,6 +196,16 @@ export class Node {
         return this.generateTetrahedronFaces(position, scale);
       case GeometryType.DODECAHEDRON:
         return this.generateDodecahedronFaces(position, scale);
+      case GeometryType.SPHERE:
+        // Spheres connect from their centre — a single implicit "surface" face.
+        return [
+          {
+            id: 'center',
+            normal: { x: 0, y: 0, z: 1 },
+            center: { ...position },
+            vertices: [],
+          },
+        ];
       default:
         return this.generateCubeFaces(position, scale);
     }
@@ -408,6 +418,9 @@ export class Node {
       [NodeType.INTERFACE]: '#00BCD4',
       [NodeType.VARIABLE]: '#FFEB3B',
       [NodeType.CONSTANT]: '#795548',
+      [NodeType.PERSON]: '#FFC107',
+      [NodeType.BOUNDARY]: '#E0E0E0',
+      [NodeType.JUNCTION]: '#888888',
     };
 
     return colorMap[this.type] || '#808080';

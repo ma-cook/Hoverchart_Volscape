@@ -38,7 +38,7 @@ export const connectionMethods = {
       const name = match[1];
       const sequenceStr = match[2];
       const nodes = sequenceStr
-        .split(/\s*(?:-->|-.->|-\.->|===+>|--[^>]*>)\s*/)
+        .split(/\s*(?:<-->|<--|-->|-.->|-\.->|===+>|--[^>]*>|--)\s*/)
         .map(n => n.trim())
         .filter(Boolean);
       for (let i = 0; i < nodes.length - 1; i++) {
@@ -47,7 +47,7 @@ export const connectionMethods = {
     }
 
     const taggedConnRegex =
-      /^[ \t]*(\w[\w-]*)[ \t]*(?:-->|-.->|-\.->|===+>|--[^>]*>)[ \t]*(\w[\w-]*)[ \t]*(?::\s*"[^"]*")?[ \t]*((?:#\w+[ \t]*)+)/gm;
+      /^[ \t]*(\w[\w-]*)[ \t]*(?:<-->|<--|-->|-.->|-\.->|===+>|==|\*-->|\.\.>|--[^>]*>|--)[ \t]*(\w[\w-]*)[ \t]*(?::\s*"[^"]*")?[ \t]*((?:#\w+[ \t]*)+)/gm;
     while ((match = taggedConnRegex.exec(merfolkContent)) !== null) {
       const srcId = match[1];
       const tgtId = match[2];
@@ -155,6 +155,9 @@ export const connectionMethods = {
             return TETRAHEDRON_FACES[currentCount % TETRAHEDRON_FACES.length];
           } else if (objectType === 'octahedron') {
             return OCTAHEDRON_FACES[currentCount % OCTAHEDRON_FACES.length];
+          } else if (objectType === 'sphere') {
+            // Spheres connect from their centre — a single implicit "surface" face.
+            return 'center';
           } else {
             return CUBE_FACES[currentCount % CUBE_FACES.length];
           }
@@ -164,6 +167,10 @@ export const connectionMethods = {
           const pos = [...objectPosition];
           const s = objectScale || [1, 1, 1];
           const cubeSize = 5;
+
+          if (objectType === 'sphere') {
+            return pos;
+          }
 
           if (objectType === 'tetrahedron') {
             const TETRA_SIZE = 5;
@@ -346,6 +353,8 @@ export const connectionMethods = {
             sourceNode: sourceNodeId,
             targetNode: targetNodeId,
             connectionType: connection.type,
+            arrowStart: !!connection.arrowStart,
+            arrowEnd: !!connection.arrowEnd,
             flowPaths: Array.from(
               connectionTags.get(`${sourceNodeId}|${targetNodeId}`) || []
             ),

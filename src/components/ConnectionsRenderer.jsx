@@ -5,6 +5,7 @@ import { acquireBudget, isCameraMoving, isFrameBudgetExhausted } from '../utils/
 import InstancedLine from './InstancedLine';
 import BatchedConnectionLines from './BatchedConnectionLines';
 import BatchedCurvedLines from './BatchedCurvedLines';
+import ConnectionArrowheads from './ConnectionArrowheads';
 import AtlasTextSprite from './AtlasTextSprite';
 import DistanceFilteredTextLabels from './DistanceFilteredTextLabels';
 import LineUI from './LineUI';
@@ -1634,6 +1635,13 @@ const ConnectionsRenderer = ({
           lineWidth={1}
         />
       )}
+
+      {/* Merfolk arrowheads — instanced cones for arrow-decorated connections,
+          LOD-gated to FULL endpoint detail */}
+      <ConnectionArrowheads
+        connections={progressiveConnections}
+        objects={objects}
+      />
       
       {/* PERFORMANCE: Render text labels with distance filtering - only visible within 500 units */}
       <DistanceFilteredTextLabels

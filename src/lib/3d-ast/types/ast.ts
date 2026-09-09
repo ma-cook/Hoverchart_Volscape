@@ -22,6 +22,10 @@ export enum NodeType {
   INTERFACE = 'interface',
   VARIABLE = 'variable',
   CONSTANT = 'constant',
+  // C4/architecture extensions
+  PERSON = 'person',
+  BOUNDARY = 'boundary',
+  JUNCTION = 'junction',
 }
 
 /**
@@ -91,6 +95,8 @@ export interface ASTConnection {
   metadata: Record<string, any>;
   waypoints?: Position3D[]; // Optional waypoints for curved connections
   flowPaths?: string[]; // IDs of flow paths this connection belongs to
+  arrowStart?: boolean; // Render an arrowhead at the source end
+  arrowEnd?: boolean; // Render an arrowhead at the target end
 }
 
 /**

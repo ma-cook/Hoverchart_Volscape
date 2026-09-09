@@ -7,10 +7,14 @@ import {
   NODE_TYPE_DATAPATH,
   NODE_TYPE_LIBRARY,
   NODE_TYPE_MODULE,
+  NODE_TYPE_PERSON,
+  NODE_TYPE_BOUNDARY,
+  NODE_TYPE_JUNCTION,
   OBJECT_TYPE_DODECAHEDRON,
   OBJECT_TYPE_OCTAHEDRON,
   DEFAULT_CONTAINER_SIZE,
   BASE_DODECAHEDRON_RADIUS,
+  JUNCTION_MARKER_SCALE,
 } from './constants.js';
 
 export const positionMethods = {
@@ -420,12 +424,17 @@ export const positionMethods = {
     }
 
     const objectType = this.getObjectTypeForNode(node);
-    if (!objectType) return;
+    // Boundaries produce no object of their own but still occupy a root grid
+    // slot and recurse into their members — so let them through here.
+    if (!objectType && nodeType !== NODE_TYPE_BOUNDARY) return;
 
     let nodeScale = [1, 1, 1];
     let containerSize = DEFAULT_CONTAINER_SIZE;
 
-    if (objectType === OBJECT_TYPE_DODECAHEDRON) {
+    if (nodeType === NODE_TYPE_JUNCTION) {
+      // Junctions are tiny markers — renderpoint scale handled in objectMethods.
+      nodeScale = [JUNCTION_MARKER_SCALE, JUNCTION_MARKER_SCALE, JUNCTION_MARKER_SCALE];
+    } else if (objectType === OBJECT_TYPE_DODECAHEDRON) {
       const scaleResult = this.calculateDodecahedronScale(
         nodeId,
         parentChildMap,
@@ -941,6 +950,17 @@ export const positionMethods = {
       // Datapaths don't produce 3D objects
       if (nodeType === NODE_TYPE_DATAPATH) continue;
 
+      // People, boundaries and junctions are not type-grouped — people keep
+      // their positionNodeHierarchy root-grid slot, boundaries become
+      // boundary containers, junctions are markers.
+      if (
+        nodeType === NODE_TYPE_PERSON ||
+        nodeType === NODE_TYPE_BOUNDARY ||
+        nodeType === NODE_TYPE_JUNCTION
+      ) {
+        continue;
+      }
+
       // Determine group key — preserve backend/worker/shader splitting
       let groupKey = nodeType;
       if (nodeType === NODE_TYPE_SERVICE && nodeId.startsWith('backend_')) {
@@ -1337,5 +1357,48 @@ export const positionMethods = {
     // set of nodes when creating the "Unused Components" container, instead
     // of re-calculating with a different (broader) condition.
     context.ungroupedComponents = ungroupedComponents;
+  },
+
+  /**
+   * Apply `align row|column` directives after positions are resolved.
+   *
+   *   align row    A B C  →  shared Y (same height, horizontal row)
+   *   align column D E F  →  shared X (same lateral plane, vertical column)
+   *
+   * Pure — operates only on the maps handed to it, so it is safe to run in
+   * the layout worker (which bridges only constants + hierarchy + scale +
+   * position methods).
+   */
+  applyAlignments(context) {
+    const { nodePositions, alignments } = context;
+    if (!alignments || alignments.length === 0) return;
+
+    for (const alignment of alignments) {
+      const ids = alignment.nodeIds || [];
+      if (ids.length < 2) continue;
+
+      const positioned = [];
+      for (const id of ids) {
+        const pos = nodePositions.get(id);
+        if (!pos) continue;
+        positioned.push(pos);
+      }
+      if (positioned.length < 2) continue;
+
+      if (alignment.mode === 'row') {
+        const avgY =
+          positioned.reduce((s, p) => s + p[1], 0) / positioned.length;
+        positioned.forEach((p) => {
+          p[1] = avgY;
+        });
+      } else {
+        // column
+        const avgX =
+          positioned.reduce((s, p) => s + p[0], 0) / positioned.length;
+        positioned.forEach((p) => {
+          p[0] = avgX;
+        });
+      }
+    }
   },
 };

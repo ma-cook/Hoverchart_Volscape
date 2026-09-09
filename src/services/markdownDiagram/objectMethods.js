@@ -74,6 +74,7 @@ export const objectMethods = {
         // uses the same set of nodes that was positioned as "ungrouped".
         ungroupedComponents: precomputedLayout.ungroupedComponents || [],
         communityAssignments: useDiagramStore.getState().communityAssignments || null,
+        alignments: graph.metadata?.alignments || [],
         spaceId: currentSpaceId,
       };
     } else {
@@ -100,6 +101,7 @@ export const objectMethods = {
         nodeScales,
         processedNodes,
         communityAssignments: useDiagramStore.getState().communityAssignments || null,
+        alignments: graph.metadata?.alignments || [],
         spaceId: currentSpaceId,
       };
 
@@ -122,6 +124,10 @@ export const objectMethods = {
       // Apply collision detection and resolution to prevent overlapping subtrees
       this.resolveCollisions(context);
     }
+
+    // Honour `align row|column` directives (idempotent — worker paths already
+    // applied them, so re-running against the same positions is a no-op).
+    this.applyAlignments(context);
 
     // Persist hierarchy for the 2D diagram view
     useDiagramStore.getState().setHierarchy({
@@ -300,6 +306,21 @@ export const objectMethods = {
                     fontSize: 1.5, color: 'black', underline: false,
                   },
                 }
+              : data.type === 'sphere'
+              ? {
+                  headerText: data.extraData.headerText || '',
+                  headerStyle: data.extraData.headerStyle || {
+                    fontSize: 1.5, color: 'black', underline: false,
+                  },
+                  faceColors: {},
+                  faceTexts: Array(12).fill('').reduce((acc, _, idx) => {
+                    acc[idx] = ''; return acc;
+                  }, {}),
+                  faceTextStyles: Array(12).fill(null).reduce((acc, _, idx) => {
+                    acc[idx] = { fontSize: 0.5, color: 'black', underline: false };
+                    return acc;
+                  }, {}),
+                }
               : data.type === 'plane'
               ? {
                   content: data.extraData.headerText || '',
@@ -367,6 +388,16 @@ export const objectMethods = {
               headerText: data.extraData.headerText || '',
               faceColors: {},
               faceTexts: { front: '', back: '', left: '', right: '' },
+            }),
+            ...(data.type === 'sphere' && {
+              headerText: data.extraData.headerText || '',
+              headerStyle: data.extraData.headerStyle || {
+                fontSize: 1.5, color: 'black', underline: false,
+              },
+              faceColors: {},
+              faceTexts: Array(12).fill('').reduce((acc, _, idx) => {
+                acc[idx] = ''; return acc;
+              }, {}),
             }),
             merfolkData: {
               nodeId: data.nodeId,
@@ -520,6 +551,8 @@ export const objectMethods = {
 
     await new Promise(r => setTimeout(r, 0));
     await this.createGroupContainers(context, allObjectsToSave);
+    await new Promise(r => setTimeout(r, 0));
+    await this.createBoundaryContainers(context, allObjectsToSave);
     await new Promise(r => setTimeout(r, 0));
     await this.createRootHierarchyContainer(context, allObjectsToSave);
 

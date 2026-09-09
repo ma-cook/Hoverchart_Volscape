@@ -3,6 +3,9 @@ import {
   NODE_TYPE_FUNCTION,
   NODE_TYPE_SERVICE,
   NODE_TYPE_DATAPATH,
+  NODE_TYPE_BOUNDARY,
+  NODE_TYPE_JUNCTION,
+  NODE_TYPE_PERSON,
   BASE_DODECAHEDRON_RADIUS,
   getGroupDisplayName,
   getGroupColor,
@@ -89,6 +92,17 @@ export const containerMethods = {
 
       // Datapaths don't produce 3D objects
       if (nodeType === NODE_TYPE_DATAPATH) continue;
+
+      // People, boundaries and junctions are not type-grouped (people stay at
+      // their root-grid slots; boundaries become boundary containers; junctions
+      // are markers).
+      if (
+        nodeType === NODE_TYPE_BOUNDARY ||
+        nodeType === NODE_TYPE_JUNCTION ||
+        nodeType === NODE_TYPE_PERSON
+      ) {
+        continue;
+      }
 
       // Determine group key — preserve backend/worker/shader splitting
       let groupKey = nodeType;
@@ -253,6 +267,168 @@ export const containerMethods = {
 
     if (containerCubes.length > 0) {
       this.hydrateContainerCubes(context.spaceId, containerCubes);
+    }
+  },
+
+  /**
+   * Create labelled boundary containers around the members of every
+   * `{Boundary: name}` node. Members are whatever the hierarchy resolver
+   * nested under the boundary (explicit `in <boundaryId>` suffixes or
+   * connection-inferred containment).
+   *
+   * Boundaries produce no 3D object of their own — this container cube IS the
+   * boundary's visual representation, tinted with the boundary's style colour.
+   */
+  async createBoundaryContainers(context, allObjectsToSave) {
+    const {
+      graphNodes,
+      parentChildMap,
+      nodePositions,
+      nodeScales,
+      spaceId,
+    } = context;
+
+    let boundaryCreated = 0;
+    const boundaryCubes = [];
+
+    // Prevent duplicate boundary containers when rescan calls
+    // createObjectsFromDiagram on top of an already-populated space.
+    const existingBoundaryOf = new Set();
+    const existingObjectsSnapshot = useObjectsStore.getState().objects;
+    for (const obj of existingObjectsSnapshot) {
+      if (obj.merfolkData?.boundary && obj.merfolkData?.boundaryOf) {
+        existingBoundaryOf.add(obj.merfolkData.boundaryOf);
+      }
+    }
+
+    for (const [nodeId, node] of graphNodes.entries()) {
+      const nodeType = (node.type || '').toLowerCase().trim();
+      if (nodeType !== NODE_TYPE_BOUNDARY) continue;
+      if (existingBoundaryOf.has(nodeId)) continue;
+
+      const children = (parentChildMap && parentChildMap.get(nodeId)) || new Set();
+      if (children.size === 0) continue;
+
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+      for (const childId of children) {
+        const pos = nodePositions.get(childId);
+        if (!pos) continue;
+
+        const childNode = graphNodes.get(childId);
+        const childType = childNode
+          ? (childNode.type || '').toLowerCase().trim()
+          : '';
+        const scale = nodeScales.get(childId) || [1, 1, 1];
+
+        // Components are dodecahedrons (radius = scale*10); everything else
+        // is a scaled cube-ish object (half-size = scale*5).
+        const halfSize =
+          childType === NODE_TYPE_COMPONENT
+            ? Math.max(...scale) * BASE_DODECAHEDRON_RADIUS
+            : childType === NODE_TYPE_PERSON
+            ? 4 // DEFAULT_SPHERE_SIZE / 1
+            : Math.max(...scale) * 5;
+
+        minX = Math.min(minX, pos[0] - halfSize);
+        maxX = Math.max(maxX, pos[0] + halfSize);
+        minY = Math.min(minY, pos[1] - halfSize);
+        maxY = Math.max(maxY, pos[1] + halfSize);
+        minZ = Math.min(minZ, pos[2] - halfSize);
+        maxZ = Math.max(maxZ, pos[2] + halfSize);
+      }
+
+      if (minX === Infinity) continue;
+
+      const padding = 100;
+      minX -= padding; maxX += padding;
+      minY -= padding; maxY += padding;
+      minZ -= padding; maxZ += padding;
+
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      const centerZ = (minZ + maxZ) / 2;
+
+      const containerScale = [
+        (maxX - minX) / 10,
+        (maxY - minY) / 10,
+        (maxZ - minZ) / 10,
+      ];
+      const containerPosition = [centerX, centerY, centerZ];
+
+      if (!Number.isFinite(containerPosition[0]) ||
+          !Number.isFinite(containerPosition[1]) ||
+          !Number.isFinite(containerPosition[2])) {
+        console.warn(
+          '⚠️ Skipping boundary container with invalid position:',
+          nodeId,
+          containerPosition
+        );
+        continue;
+      }
+
+      const color = node.visual?.color || '#E0E0E0';
+
+      const containerId = `boundary-container-${nodeId}-${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+
+      const cellCoords = getCellCoordinates(containerPosition);
+      const cellId = getCellId(cellCoords.x, cellCoords.y, cellCoords.z);
+
+      const boundaryCube = {
+        id: containerId,
+        type: 'cube',
+        position: containerPosition,
+        scale: containerScale,
+        color,
+        lineWidth: 2,
+        cellId,
+        createdAt: Date.now(),
+        headerText: node.name || node.id,
+        faceColors: {},
+        faceTexts: { front: '', back: '', top: '', bottom: '', right: '', left: '' },
+        textStyle: { fontSize: 1.2, color: 'black', underline: false },
+        merfolkData: {
+          isContainer: true,
+          nonInteractive: true,
+          groupType: 'boundary',
+          boundary: true,
+          boundaryOf: nodeId,
+          groupLabel: node.name || nodeId,
+          nodeCount: children.size,
+        },
+      };
+
+      boundaryCubes.push(boundaryCube);
+
+      allObjectsToSave.push({
+        id: containerId,
+        position: containerPosition,
+        size: containerScale,
+        scale: containerScale,
+        type: 'cube',
+        color,
+        lineWidth: 2,
+        content: node.name || node.id,
+        createdAt: Date.now(),
+        cellId,
+        headerText: node.name || node.id,
+        faceColors: {},
+        faceTexts: { front: '', back: '', top: '', bottom: '', right: '', left: '' },
+        merfolkData: boundaryCube.merfolkData,
+      });
+
+      boundaryCreated++;
+    }
+
+    if (boundaryCubes.length > 0) {
+      this.hydrateContainerCubes(spaceId, boundaryCubes);
+    }
+
+    if (boundaryCreated > 0) {
+      console.log(`🗺️ Created ${boundaryCreated} boundary container(s)`);
     }
   },
 

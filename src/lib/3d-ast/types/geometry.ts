@@ -41,6 +41,7 @@ export enum GeometryType {
   CUBE = 'cube',
   TETRAHEDRON = 'tetrahedron',
   DODECAHEDRON = 'dodecahedron',
+  SPHERE = 'sphere',
 }
 
 /**

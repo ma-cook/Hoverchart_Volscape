@@ -14,10 +14,14 @@ import {
   NODE_TYPE_INTERFACE,
   NODE_TYPE_VARIABLE,
   NODE_TYPE_CONSTANT,
+  NODE_TYPE_PERSON,
+  NODE_TYPE_BOUNDARY,
+  NODE_TYPE_JUNCTION,
   OBJECT_TYPE_CUBE,
   OBJECT_TYPE_DODECAHEDRON,
   OBJECT_TYPE_TETRAHEDRON,
   OBJECT_TYPE_OCTAHEDRON,
+  OBJECT_TYPE_SPHERE,
 } from './constants.js';
 
 export const hierarchyMethods = {
@@ -126,6 +130,15 @@ export const hierarchyMethods = {
           childParentMap.set(childId, parentId);
         }
       };
+
+      // Seed explicit `Node[...] in <parentId>` membership first so explicit
+      // containment takes precedence over connection-inferred hierarchy.
+      Array.from(graph.nodes.values()).forEach((node) => {
+        const parentId = node.parent || node.metadata?.parentId;
+        if (!parentId || parentId === node.id) return;
+        if (wouldCreateCycle(node.id, parentId)) return;
+        addParentChildRelation(parentId, node.id);
+      });
 
       Array.from(graph.connections.values()).forEach((connection) => {
         const sourceId = connection.source?.nodeId || connection.source;
@@ -284,6 +297,14 @@ export const hierarchyMethods = {
         return OBJECT_TYPE_TETRAHEDRON;
       case NODE_TYPE_DATAPATH:
         return null;
+      case NODE_TYPE_PERSON:
+        return OBJECT_TYPE_SPHERE;
+      case NODE_TYPE_BOUNDARY:
+        // Boundaries are backdrop/frame objects — no object of their own; they
+        // become boundary containers in containerMethods.
+        return null;
+      case NODE_TYPE_JUNCTION:
+        return OBJECT_TYPE_CUBE;
       case NODE_TYPE_FUNCTION:
       case NODE_TYPE_STORE:
       case NODE_TYPE_LIBRARY:

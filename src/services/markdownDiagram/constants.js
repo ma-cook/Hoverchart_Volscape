@@ -22,12 +22,16 @@ export const NODE_TYPE_CLASS = 'class';
 export const NODE_TYPE_INTERFACE = 'interface';
 export const NODE_TYPE_VARIABLE = 'variable';
 export const NODE_TYPE_CONSTANT = 'constant';
+export const NODE_TYPE_PERSON = 'person';
+export const NODE_TYPE_BOUNDARY = 'boundary';
+export const NODE_TYPE_JUNCTION = 'junction';
 
 // Object type constants
 export const OBJECT_TYPE_CUBE = 'cube';
 export const OBJECT_TYPE_DODECAHEDRON = 'dodecahedron';
 export const OBJECT_TYPE_TETRAHEDRON = 'tetrahedron';
 export const OBJECT_TYPE_OCTAHEDRON = 'octahedron';
+export const OBJECT_TYPE_SPHERE = 'sphere';
 
 // UI component identifiers
 export const UI_COMPONENTS = [
@@ -48,6 +52,7 @@ export const DEFAULT_SPHERE_SIZE = 4;
 export const DEFAULT_CONTAINER_SIZE = 50;
 export const MIN_SCALE_FACTOR = 1.0;
 export const DESIRED_GAP = 8;
+export const JUNCTION_MARKER_SCALE = 0.35;
 
 // ── Dynamic group container support ──────────────────────────────────────────
 
@@ -87,6 +92,7 @@ const GROUP_DISPLAY_NAMES = {
   interface: 'Interfaces',
   variable: 'Variables',
   constant: 'Constants',
+  person: 'People',
 };
 
 /**

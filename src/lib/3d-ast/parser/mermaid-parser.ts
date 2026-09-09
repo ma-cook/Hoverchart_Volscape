@@ -11,6 +11,7 @@ export interface ParsedNode {
   geometry: GeometryType;
   description?: string;
   properties?: Record<string, any>;
+  parentId?: string; // Explicit containment target from `in <parent>` suffix
 }
 
 /**
@@ -30,6 +31,8 @@ export interface ParsedConnection {
   label?: string;
   properties?: Record<string, any>;
   flowPaths?: string[]; // IDs of flow paths this connection belongs to
+  arrowStart?: boolean; // Arrowhead at the source end
+  arrowEnd?: boolean; // Arrowhead at the target end
 }
 
 /**
@@ -44,6 +47,23 @@ export interface ParsedFlowPath {
 }
 
 /**
+ * A single targeted styling directive (from a `style` or `relstyle` line).
+ */
+export interface StyleDirective {
+  kind: 'node' | 'connection';
+  targets: string[]; // Node types for `style`, connection types for `relstyle`
+  properties: Record<string, any>;
+}
+
+/**
+ * An `align row|column` layout directive over a set of node IDs.
+ */
+export interface AlignmentDirective {
+  mode: 'row' | 'column';
+  nodeIds: string[];
+}
+
+/**
  * Parsed graph structure
  */
 export interface ParsedGraph {
@@ -53,6 +73,8 @@ export interface ParsedGraph {
   connections: ParsedConnection[];
   flowPaths: ParsedFlowPath[];
   metadata?: Record<string, any>;
+  styles?: StyleDirective[];
+  alignments?: AlignmentDirective[];
 }
 
 /**
@@ -64,6 +86,8 @@ export class MermaidParser {
   private nodes: ParsedNode[] = [];
   private connections: ParsedConnection[] = [];
   private flowPaths: ParsedFlowPath[] = [];
+  private styles: StyleDirective[] = [];
+  private alignments: AlignmentDirective[] = [];
   private nodeIdCounter = 0;
   private connectionIdCounter = 0;
   private flowPathIdCounter = 0;
@@ -125,6 +149,59 @@ export class MermaidParser {
         continue;
       }
 
+      // Parse junction declarations (volume-less rendezvous points)
+      if (line.startsWith('junction ')) {
+        const node = this.parseJunction(line);
+        if (node) {
+          if (this.seenNodeIds.has(node.id)) {
+            console.warn(
+              `[MermaidParser] Skipping duplicate junction: ${node.id}`
+            );
+          } else {
+            this.seenNodeIds.add(node.id);
+            this.nodes.push(node);
+          }
+        }
+        continue;
+      }
+
+      // Parse style directives
+      if (line.startsWith('style ')) {
+        const style = this.parseStyleDirective(line);
+        if (style) this.styles.push(style);
+        continue;
+      }
+
+      // Parse relation style directives
+      if (line.startsWith('relstyle ')) {
+        const style = this.parseStyleDirective(line, true);
+        if (style) this.styles.push(style);
+        continue;
+      }
+
+      // Parse alignment directives
+      if (line.startsWith('align ')) {
+        const alignment = this.parseAlignmentDirective(line);
+        if (alignment) this.alignments.push(alignment);
+        continue;
+      }
+
+      // Parse bare brace declarations, e.g. `{Boundary: PCI-DSS Zone}` or
+      // `{Component: Checkout}`. These have no explicit node id — the label
+      // doubles as the id so it can be referenced by `in <...>` membership.
+      if (/^\{[^\s{][^}]*\}/.test(line.trim())) {
+        const node = this.parseBareBraceDeclaration(line.trim());
+        if (node) {
+          if (this.seenNodeIds.has(node.id)) {
+            console.warn(`[MermaidParser] Skipping duplicate node: ${node.id}`);
+          } else {
+            this.seenNodeIds.add(node.id);
+            this.nodes.push(node);
+          }
+        }
+        continue;
+      }
+
       // Parse node definition (skip duplicates)
       if (this.isNodeDefinition(line)) {
         const node = this.parseNodeDefinition(line);
@@ -166,6 +243,8 @@ export class MermaidParser {
       connections: this.connections,
       flowPaths: this.flowPaths,
       metadata,
+      styles: this.styles,
+      alignments: this.alignments,
     };
   }
 
@@ -178,6 +257,8 @@ export class MermaidParser {
     this.nodes = [];
     this.connections = [];
     this.flowPaths = [];
+    this.styles = [];
+    this.alignments = [];
     this.nodeIdCounter = 0;
     this.connectionIdCounter = 0;
     this.flowPathIdCounter = 0;
@@ -193,7 +274,9 @@ export class MermaidParser {
     // C((Module: Database))
     // D<Datapath: eventStream>
     // E[[Class: UserModel]]
-    return /^[A-Za-z0-9_/.\-]+[\[\{\(<]/.test(line);
+    // P~Person: Alice~          (tilde — person sphere)
+    // Q[Service: checkouts] in <payments>   (explicit containment)
+    return /^[A-Za-z0-9_/.\-]+[\[\{\(<~]/.test(line);
   }
 
   /**
@@ -206,7 +289,8 @@ export class MermaidParser {
       line.includes('-.->') ||
       line.includes('==') ||
       line.includes('*-->') ||
-      line.includes('..>')
+      line.includes('..>') ||
+      line.includes('<--')
     );
   }
 
@@ -234,6 +318,7 @@ export class MermaidParser {
     // optional `@face` separator in connection patterns stays unambiguous; the
     // emitter (githubRepoService) replaces leading `@` with `_` for npm scopes.
     const patterns = [
+      /^([A-Za-z0-9_/.\-]+)~([^:]+):\s*([^~]+)~/,              // Tilde (person sphere)
       /^([A-Za-z0-9_/.\-]+)\[\[([^:]+):\s*([^\]]+)\]\]/,  // Double square brackets (must be before single)
       /^([A-Za-z0-9_/.\-]+)\[([^:]+):\s*([^\]]+)\]/,      // Square brackets
       /^([A-Za-z0-9_/.\-]+)\{([^:]+):\s*([^\}]+)\}/,      // Curly brackets
@@ -261,6 +346,18 @@ export class MermaidParser {
           properties = this.parseMultiLineProperties();
         }
 
+        // Explicit containment: `Node[...] in <parentId>` (or ` in parentId`).
+        // Consumed only AFTER the matched node token so label text containing
+        // " in " is never misinterpreted.
+        let parentId: string | undefined;
+        const remainder = line.substring(match[0].length).trim();
+        const parentMatch = remainder.match(
+          /^in\s+(?:<([A-Za-z0-9_/.\- ]+)>|([A-Za-z0-9_/.\-]+))/
+        );
+        if (parentMatch) {
+          parentId = parentMatch[1] || parentMatch[2];
+        }
+
         return {
           id: id || `node_${this.nodeIdCounter++}`,
           type,
@@ -268,6 +365,7 @@ export class MermaidParser {
           geometry,
           description: properties.description,
           properties,
+          parentId,
         };
       }
     }
@@ -303,25 +401,32 @@ export class MermaidParser {
 
     const patterns = [
       // Pattern for -->|"label"| syntax (Mermaid-style)
-      /^([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?\s*(\*-->|-->|---|-.->|==|\.\.>)\s*\|\s*['""]([^'"]+)['"]\s*\|\s*([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?/,
+      /^([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?\s*(<)?(-->|---|-.->|==|\*-->|\.\.>|--)(>)?\s*\|\s*['""]([^'"]+)['"]\s*\|\s*([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?/,
       // Pattern for : "label" syntax (original)
-      /^([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?\s*(\*-->|-->|---|-.->|==|\.\.>)\s*([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?\s*(?::\s*['""]([^'"]+)['""])?/,
+      /^([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?\s*(<)?(-->|---|-.->|==|\*-->|\.\.>|--)(>)?\s*([A-Za-z0-9_/.\-]+)(?:@([A-Za-z0-9_]+))?\s*(?::\s*['""]([^'"]+)['""])?/,
     ];
 
+    // Per-end arrowheads. A leading ` < ` decorator shows an arrowhead at the
+    // SOURCE, a trailing ` > ` shows one at the TARGET; bare `-->`-family tokens
+    // that already end in `>` default to arrowEnd (headless `---`/`==`/`--`
+    // stay headless unless decorated).
     for (const pattern of patterns) {
       const match = cleanLine.match(pattern);
       if (match) {
         let sourceId, sourceFace, arrow, targetId, targetFace, label;
+        let startDecorator, endDecorator;
 
         if (pattern === patterns[0]) {
           // -->|"label"| syntax
-          [, sourceId, sourceFace, arrow, label, targetId, targetFace] = match;
+          [, sourceId, sourceFace, startDecorator, arrow, endDecorator, label, targetId, targetFace] = match;
         } else {
           // : "label" syntax
-          [, sourceId, sourceFace, arrow, targetId, targetFace, label] = match;
+          [, sourceId, sourceFace, startDecorator, arrow, endDecorator, targetId, targetFace, label] = match;
         }
 
         const type = this.parseConnectionType(arrow);
+        const arrowStart = startDecorator === '<';
+        const arrowEnd = endDecorator === '>' || (arrow ? arrow.endsWith('>') : false);
 
         return {
           id: `conn_${this.connectionIdCounter++}`,
@@ -337,6 +442,8 @@ export class MermaidParser {
           label,
           properties: {},
           flowPaths: flowPathTags.length > 0 ? flowPathTags : undefined,
+          arrowStart,
+          arrowEnd,
         };
       }
     }
@@ -394,9 +501,14 @@ export class MermaidParser {
       case 'middleware':
         return NodeType.FUNCTION;   // cube, grouped with functions
       case 'boundary':
-        return NodeType.MODULE;     // cube, grouped with modules
+        return NodeType.BOUNDARY;   // implicit backdrop/container, not grouped
       case 'model':
         return NodeType.STORE;      // cube, grouped with stores
+      case 'person':
+      case 'actor':
+        return NodeType.PERSON;     // sphere, root-positioned
+      case 'junction':
+        return NodeType.JUNCTION;   // tiny cube marker, never grouped
       default:
         return NodeType.COMPONENT; // Default fallback
     }
@@ -405,6 +517,10 @@ export class MermaidParser {
    * Parse geometry from line (based on bracket type)
    */
   private parseGeometry(line: string): GeometryType {
+    // Tilde pattern `ID~Person: Name~` -> SPHERE
+    if (line.includes('~')) {
+      return GeometryType.SPHERE;
+    }
     // Double-bracket must come before single-bracket — [[Store: x]] contains
     // both '[' and ']' characters, so single-bracket would match first otherwise.
     // [[Store: name]] -> CUBE
@@ -448,6 +564,8 @@ export class MermaidParser {
         return ConnectionType.COMPOSITION;
       case '..>':
         return ConnectionType.DEPENDENCY;
+      case '--':
+        return ConnectionType.ASSOCIATION;
       default:
         return ConnectionType.ASSOCIATION;
     }
@@ -470,6 +588,116 @@ export class MermaidParser {
     }
 
     return properties;
+  }
+
+  /**
+   * Parse a `junction J1` declaration into a volume-less rendezvous marker.
+   */
+  private parseJunction(line: string): ParsedNode | null {
+    const match = line.match(/^junction\s+([A-Za-z0-9_/.\-]+)/);
+    if (!match) return null;
+    const id = match[1];
+    return {
+      id,
+      type: NodeType.JUNCTION,
+      name: id,
+      geometry: GeometryType.CUBE,
+      properties: {},
+    };
+  }
+
+  /**
+   * Parse a bare brace declaration: `{Boundary: PCI-DSS Zone}` or
+   * `{Component: Checkout}`. No explicit id prefix — the label doubles as the
+   * node id (so it can be referenced by `in <...>` membership and connections)
+   * and as the display name. Unrecognized keywords default to Component.
+   */
+  private parseBareBraceDeclaration(line: string): ParsedNode | null {
+    const match = line.match(/^\{\s*([^:]+):\s*([^}]+)\}$/);
+    if (!match) return null;
+    const type = this.parseNodeType(match[1].trim());
+    const label = match[2].trim();
+    return {
+      id: label,
+      type,
+      name: label,
+      geometry: GeometryType.DODECAHEDRON,
+      properties: {},
+    };
+  }
+
+  /**
+   * Parse a single-line `key: value` property block. Values may be quoted
+   * strings, numbers, booleans, arrays, or nested brace objects.
+   */
+  private parseInlineBlockProps(block: string): Record<string, any> {
+    const properties: Record<string, any> = {};
+    const re = /([A-Za-z_][A-Za-z0-9_]*)\s*:\s*((?:"[^"]*"|'[^']*'|\[[^\]]*\]|\{[^{}]*\}|[^,\s{}]+))/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(block)) !== null) {
+      let value: any = m[2].trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      } else if (
+        (value.startsWith('[') && value.endsWith(']')) ||
+        (value.startsWith('{') && value.endsWith('}'))
+      ) {
+        try {
+          value = JSON.parse(value);
+        } catch {
+          // Keep as string if JSON parsing fails
+        }
+      } else if (!isNaN(Number(value))) {
+        value = Number(value);
+      } else if (value === 'true') {
+        value = true;
+      } else if (value === 'false') {
+        value = false;
+      }
+      properties[m[1]] = value;
+    }
+    return properties;
+  }
+
+  /**
+   * Parse a `style`/`relstyle` directive.
+   *   style  Component, Service { color: "#f00", opacity: 0.9 }   // by node type
+   *   relstyle dataflow          { color: "#0ff", lineStyle: "dashed" } // by connection type
+   */
+  private parseStyleDirective(line: string, isRel = false): StyleDirective | null {
+    const match = line.match(/^(?:style|relstyle)\s+(.+?)\s*\{\s*(.*?)\s*\}$/);
+    if (!match) return null;
+    const targets = match[1]
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (targets.length === 0) return null;
+    const properties = this.parseInlineBlockProps(match[2]);
+    return {
+      kind: isRel ? 'connection' : 'node',
+      targets,
+      properties,
+    };
+  }
+
+  /**
+   * Parse an `align row|column` directive.
+   *   align row A B C
+   *   align column D E F
+   */
+  private parseAlignmentDirective(line: string): AlignmentDirective | null {
+    const match = line.match(/^align\s+(row|column)\s+(.+)$/);
+    if (!match) return null;
+    const mode = match[1] as AlignmentDirective['mode'];
+    const nodeIds = match[2]
+      .trim()
+      .split(/\s+/)
+      .filter((s) => s.length > 0);
+    if (nodeIds.length < 2) return null;
+    return { mode, nodeIds };
   }
 
   /**
@@ -552,9 +780,10 @@ export class MermaidParser {
     const [, name, arrowOverride, pathPart, description] = flowPathMatch;
 
     // Parse the node chain: A --> B --> C --> D
-    // We split on arrow patterns to extract the node IDs
+    // We split on arrow patterns (including `<--`/`<-->` decorated forms)
+    // to extract the node IDs.
     const nodeIds = pathPart
-      .split(/\s*(?:-->|-.->|---|==)\s*/)
+      .split(/\s*(?:<-->|<--|-->|-.->|---|==|\*-->|\.\.>|--)\s*/)
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
@@ -564,6 +793,11 @@ export class MermaidParser {
     const connectionType = arrowOverride
       ? this.parseConnectionType(arrowOverride.trim())
       : ConnectionType.DATA_FLOW;
+
+    // Flow paths are directional by default (data travels `-->`); an explicit
+    // arrow-type override keeps its own decorations.
+    const arrowStart = arrowOverride ? /^</.test(arrowOverride.trim()) : false;
+    const arrowEnd = arrowOverride ? />$/.test(arrowOverride.trim()) : true;
 
     // Create connections for each adjacent pair, all tagged with this flow path
     const connectionIds: string[] = [];
@@ -594,6 +828,8 @@ export class MermaidParser {
           label: undefined,
           properties: {},
           flowPaths: [name],
+          arrowStart,
+          arrowEnd,
         });
       }
     }

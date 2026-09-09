@@ -128,21 +128,28 @@ B{Component: UserInterface}
 C((Module: Database))
 D<Datapath: eventStream>
 E[[Class: UserModel]]
+U~Person: Analyst~
 
-%% Connections
+%% Explicit containment ("in" membership)
+S[Service: reporting] in <B>
+
+%% Boundary + junction primitives
+{Boundary: Reporting}
+{Component: CrossCuttingConcerns}
+junction J1
+
+%% Connections (per-end arrow decorators)
 A --> B : "processed data"
 B -.-> D : "user events"
-C --> A : "raw data"
-D --> C : "queries"
-E --- C : "model mapping"
+A <-- C : "raw data"        %% arrow at the SOURCE end
+A <--> E : "shared model"   %% arrows at BOTH ends
+F --- C : "headless link"
 
-%% Face-specific connections
-A@front --> B@back : "direct connection"
-C@top --> E@bottom : "inheritance"
-
-%% Flow path tags on individual connections
-A --> B : "data" #userDataFlow
-B --> D : "events" #userDataFlow #eventFlow
+%% Directives
+align row B U
+align column A E
+style Function, Service { color: "#4CAF50" }
+relstyle dataflow { color: "#00BCD4", lineStyle: "dashed" }
 
 %% Flow path definitions (auto-creates tagged connections)
 flowpath "requestLifecycle" : B --> A --> C --> E
