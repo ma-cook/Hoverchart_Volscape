@@ -103,13 +103,13 @@ canvas {
   background-color: rgba(0, 0, 0, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.5;
-  padding: 10px 30px 10px 14px;
+  padding: 8px 24px 8px 12px;
   border-radius: 8px;
-  min-width: 240px;
-  max-width: 260px;
-  min-height: 56px;
+  min-width: 200px;
+  max-width: 240px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
@@ -299,6 +299,12 @@ canvas {
 .menu-content {
   padding: 20px;
   color: white;
+}
+
+.tools-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .shape-button {
