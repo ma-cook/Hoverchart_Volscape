@@ -2095,9 +2095,9 @@ const UIOverlay = ({
           )}
         </div>
       </div>
-      <div className="ui-stack" onClick={(e) => e.stopPropagation()}>
-        {/* In trial mode a standalone login button sits above the tools panel */}
-        {trialMode && !user && (
+      {/* Trial-mode login button - fixed under the top bar, top right */}
+      {trialMode && !user && (
+        <div className="login-bar">
           <div className="login-tooltip-row">
             <button onClick={onLogin} className="login-button" title="Login">
               login
@@ -2114,7 +2114,9 @@ const UIOverlay = ({
               </>
             )}
           </div>
-        )}
+        </div>
+      )}
+      <div className="ui-stack" onClick={(e) => e.stopPropagation()}>
         <div className="ui-overlay">
         {isLoading ? (
           <div className="ui-panel">Loading...</div>
