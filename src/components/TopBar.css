@@ -119,12 +119,13 @@
   border-color: rgba(255, 71, 87, 0.5);
   color: #fff;
   font-size: 0;
+  border-radius: 50%;
 }
 .top-bar-btn.record:hover {
   background: linear-gradient(135deg, #ff3742, #ff2f3a);
 }
 .top-bar-btn.record.recording {
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
 }
 
