@@ -67,6 +67,7 @@ canvas {
 
 .login-tooltip-row {
   position: relative;
+  width: 180px;
 }
 
 /* Login button - wide pill, sits under the top bar on the right */
