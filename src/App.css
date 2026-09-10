@@ -905,7 +905,7 @@ body {
   background: linear-gradient(135deg, #ff4757, #ff3742);
   color: white;
   border: none;
-  border-radius: 25px;
+  border-radius: 50%;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
