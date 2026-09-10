@@ -168,6 +168,30 @@
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* Organization button in the landing top bar (only when logged in) */
+.top-bar-org-button {
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6e6e6;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.top-bar-org-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .sidebar-pending-badge {
   background: #e53e3e;
   color: white;

@@ -59,15 +59,9 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
 
   const setLandingScene = useSceneStore((s) => s.setLandingScene);
   useEffect(() => {
-    setLandingScene(
-      <LandingScene
-        user={user}
-        scrollProgressRef={scrollProgressRef}
-        windowSize={windowSize}
-      />
-    );
+    setLandingScene(<LandingScene />);
     return () => setLandingScene(null);
-  }, [user, scrollProgressRef, windowSize, setLandingScene]);
+  }, [setLandingScene]);
 
   const scheduleScrollUpdate = useCallback((value) => {
     scrollProgressRef.current = value;
@@ -445,14 +439,15 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
         onClose={() => setShowOrgManager(false)}
       />
 
+      <LandingTopBar
+        user={user}
+        onLogout={handleLogout}
+        onOpenOrgManager={() => setShowOrgManager(true)}
+        pendingInviteCount={pendingInvites.length}
+      />
+
       {user && (
         <>
-          <LandingTopBar
-            user={user}
-            onLogout={handleLogout}
-            onOpenOrgManager={() => setShowOrgManager(true)}
-            pendingInviteCount={pendingInvites.length}
-          />
           <div
             style={{
               position: 'fixed',

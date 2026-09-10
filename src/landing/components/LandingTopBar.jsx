@@ -88,51 +88,65 @@ const LandingTopBar = ({ user, onLogout, onOpenOrgManager, pendingInviteCount = 
 
         <div className="top-bar-divider" />
 
-        <div className="top-bar-section actions" />
-
-        <div className="top-bar-divider" />
-
-        <div className="top-bar-section" ref={dropdownRef}>
-          <div style={{ position: 'relative' }}>
-            <div onClick={() => setDropdownOpen((prev) => !prev)}>
-              <Avatar user={user} />
-            </div>
-            {dropdownOpen && (
-              <div className="avatar-dropdown">
-                <div className="avatar-dropdown-user">
-                  {user.displayName || user.email}
+        {user && (
+          <>
+            <div className="top-bar-section" ref={dropdownRef}>
+              <button
+                className="top-bar-org-button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenOrgManager();
+                }}
+              >
+                <span>Organization</span>
+                {pendingInviteCount > 0 && (
+                  <span className="sidebar-pending-badge">{pendingInviteCount}</span>
+                )}
+              </button>
+              <div style={{ position: 'relative' }}>
+                <div onClick={() => setDropdownOpen((prev) => !prev)}>
+                  <Avatar user={user} />
                 </div>
-                <button
-                  className="avatar-dropdown-logout"
-                  onClick={() => {
-                    setDropdownOpen(false);
-                    onLogout();
-                  }}
-                >
-                  Logout
-                </button>
+                {dropdownOpen && (
+                  <div className="avatar-dropdown">
+                    <div className="avatar-dropdown-user">
+                      {user.displayName || user.email}
+                    </div>
+                    <button
+                      className="avatar-dropdown-logout"
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        onLogout();
+                      }}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className={`sidebar-menu ${menuOpen ? 'open' : ''}`}>
         <div className="menu-content">
-          <div className="sidebar-org-section">
-            <button
-              className="sidebar-org-button"
-              onClick={() => {
-                setMenuOpen(false);
-                onOpenOrgManager();
-              }}
-            >
-              <span>Organization</span>
-              {pendingInviteCount > 0 && (
-                <span className="sidebar-pending-badge">{pendingInviteCount}</span>
-              )}
-            </button>
-          </div>
+          {user && (
+            <div className="sidebar-org-section">
+              <button
+                className="sidebar-org-button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenOrgManager();
+                }}
+              >
+                <span>Organization</span>
+                {pendingInviteCount > 0 && (
+                  <span className="sidebar-pending-badge">{pendingInviteCount}</span>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>
