@@ -43,6 +43,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
   const [sharedEmail, setSharedEmail] = useState('');
   const [isCreatingSpace, setIsCreatingSpace] = useState(false);
   const [userSpaces, setUserSpaces] = useState({ owned: [], shared: [] });
+  const [spacesLoading, setSpacesLoading] = useState(true);
 
   const MAX_SCROLL = 3000;
   const rawScrollRef = useRef(0);
@@ -53,6 +54,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
 
   const authState = useAuthStore((s) => s.authState);
   const user = authState.user;
+  const isAuthReady = authState.isAuthReady;
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const signOut = useAuthStore((s) => s.signOut);
@@ -128,6 +130,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
 
   useEffect(() => {
     if (user) {
+      setSpacesLoading(true);
       fetchUserSpaces();
       getUserOrganizations(user.sub)
         .then((orgs) => {
@@ -149,6 +152,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
         .catch(() => setPendingInvites([]));
     } else {
       setUserSpaces({ owned: [], shared: [] });
+      setSpacesLoading(false);
       setUserOrganizations([]);
       setActiveOrgMembers([]);
       setPendingInvites([]);
@@ -183,6 +187,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
 
   const fetchUserSpaces = useCallback(async () => {
     if (!user) return;
+    setSpacesLoading(true);
     try {
       const spaces = await api.get('/api/spaces');
       const owned = (spaces || []).filter((s) => s.owner_id === user.sub).map(s => ({ ...s, isOwner: true }));
@@ -190,6 +195,8 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
       setUserSpaces({ owned, shared });
     } catch (error) {
       console.error('Error fetching user spaces:', error);
+    } finally {
+      setSpacesLoading(false);
     }
   }, [user]);
 
@@ -329,6 +336,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
   const spaceTableProps = useMemo(
     () => ({
       userSpaces,
+      spacesLoading,
       userOrgs: userOrganizations,
       windowSize,
       user,
@@ -355,7 +363,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
       onManageOrganization: () => setShowOrgManager(true),
     }),
     [
-      userSpaces, userOrganizations, windowSize, user, isDeleting, pendingInvites,
+      userSpaces, spacesLoading, userOrganizations, windowSize, user, isDeleting, pendingInvites,
       navigateToSpace, handleDeleteSpace, handleLeaveSpace,
       handleAcceptInvite, handleDeclineInvite, accountTier,
     ]
@@ -414,6 +422,14 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
     whiteSpace: 'nowrap',
     transition: 'background 120ms ease, border-color 120ms ease',
   };
+
+  if (!isAuthReady) {
+    return (
+      <div className="landing-view auth-loading" style={{ height: '100vh', width: '100vw', overflow: 'hidden' }}>
+        <div className="app-loading-spinner" aria-label="Loading" />
+      </div>
+    );
+  }
 
   return (
     <div

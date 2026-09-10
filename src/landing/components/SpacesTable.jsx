@@ -70,6 +70,7 @@ const NO_SPACES_TEXT = { textAlign: 'center', color: '#999' };
 export const SpacesTable = React.memo(
   ({
     userSpaces,
+    spacesLoading,
     windowSize,
     user,
     isDeleting,
@@ -139,6 +140,10 @@ export const SpacesTable = React.memo(
 
     const hasOwnedSpaces = userSpaces.owned.length > 0;
     const hasSharedSpaces = userSpaces.shared.length > 0;
+    const emptyRowStyle = useMemo(
+      () => ({ ...tdStyles, ...NO_SPACES_TEXT, padding: '28px 12px' }),
+      [tdStyles]
+    );
 
     return (
       <div
@@ -304,8 +309,15 @@ export const SpacesTable = React.memo(
             {/* No spaces message */}
             {!hasOwnedSpaces && !hasSharedSpaces && (
               <tr>
-                <td colSpan="5" style={{ ...tdStyles, ...NO_SPACES_TEXT }}>
-                  No spaces found. Create your first space!
+                <td colSpan="5" style={emptyRowStyle}>
+                  {spacesLoading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                      <span className="app-loading-spinner app-loading-spinner--sm" />
+                      <span>Loading your spaces…</span>
+                    </div>
+                  ) : (
+                    'No spaces found. Create your first space!'
+                  )}
                 </td>
               </tr>
             )}
