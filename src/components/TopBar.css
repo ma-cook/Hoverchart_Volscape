@@ -307,6 +307,116 @@ body .top-bar + .menu-button-container {
   }
 }
 
+/* ── User chip: organization name, username, avatar ───────────────── */
+
+/* Organization name label in the top bar (clickable to open the manager) */
+.top-bar-org-name {
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6e6e6;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.top-bar-org-name:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.top-bar-org-icon {
+  color: #cc8500;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.top-bar-org-text {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-bar-username {
+  font-size: 12px;
+  color: #ccc;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+/* Avatar dropdown menu */
+.avatar-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: rgba(22, 22, 26, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 160px;
+  z-index: 2100;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.avatar-dropdown-user {
+  color: #e6e6e6;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avatar-dropdown-logout {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6e6e6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  font-family: inherit;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.avatar-dropdown-logout:hover {
+  background: rgba(244, 67, 54, 0.2);
+  border-color: rgba(244, 67, 54, 0.4);
+  color: #f47864;
+}
+
+/* Pending-invite count badge (shared by top bar + sidebar) */
+.sidebar-pending-badge {
+  background: #e53e3e;
+  color: white;
+  border-radius: 50%;
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0 4px;
+}
+
 /* Top bar dropdown menu (used by templates, etc.) */
 .top-bar-dropdown {
   position: absolute;

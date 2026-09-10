@@ -96,50 +96,8 @@
   color: white;
 }
 
-/* Avatar dropdown menu */
-.avatar-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: rgba(22, 22, 26, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
-  min-width: 160px;
-  z-index: 2100;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
-}
-
-.avatar-dropdown-user {
-  color: #e6e6e6;
-  padding: 8px 12px;
-  font-size: 13px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.avatar-dropdown-logout {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.06);
-  color: #e6e6e6;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 12px;
-  text-align: left;
-  font-family: inherit;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-.avatar-dropdown-logout:hover {
-  background: rgba(244, 67, 54, 0.2);
-  border-color: rgba(244, 67, 54, 0.4);
-  color: #f47864;
-}
+/* Avatar dropdown menu and pending-invite badge now live in
+   components/TopBar.css so the shared top bar is styled in both views. */
 
 /* Sidebar organization button */
 .sidebar-org-section {
@@ -166,45 +124,6 @@
 .sidebar-org-button:hover {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.2);
-}
-
-/* Organization button in the landing top bar (only when logged in) */
-.top-bar-org-button {
-  height: 32px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #e6e6e6;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  padding: 0 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-.top-bar-org-button:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.sidebar-pending-badge {
-  background: #e53e3e;
-  color: white;
-  border-radius: 50%;
-  min-width: 18px;
-  height: 18px;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  padding: 0 4px;
 }
 
 /* Responsive adjustments for the landing topbar */

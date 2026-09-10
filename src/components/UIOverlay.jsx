@@ -31,6 +31,9 @@ import {
 } from '../services/runtimeScanService';
 import SpacePresenceAvatars from './SpacePresenceAvatars';
 import ObjectSearch from './ObjectSearch';
+import TopBar from './TopBar';
+import { OrganizationManager } from '../landing/components/OrganizationManager';
+import { signOut } from '../services/authService';
 import SpaceChat, { SPACE_CHAT_DEFAULT_WIDTH, SPACE_CHAT_DEFAULT_HEIGHT, SPACE_CHAT_GAP, CHAT_BOUNDS_LEFT, CHAT_BOUNDS_TOP, CHAT_BOUNDS_MARGIN } from './SpaceChat';
 
 const defaultChatLayout = {
@@ -524,6 +527,7 @@ const UIOverlay = ({
   }, []);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [recordingFormatOpen, setRecordingFormatOpen] = useState(false);
+  const [showOrgManager, setShowOrgManager] = useState(false);
   const [runtimeScanUrl, setRuntimeScanUrl] = useState('');
   const [runtimeScanDuration, setRuntimeScanDuration] = useState(10);
   const [lastScannedUrl, setLastScannedUrl] = useState(null);
@@ -1306,6 +1310,10 @@ const UIOverlay = ({
     toggleMenu('main');
   };
 
+  const handleLogout = useCallback(() => {
+    signOut();
+  }, []);
+
   // Track whether the user has explicitly toggled visibility.
   const userHasManuallyToggled = useRef(false);
   // Track when a diagram was auto-generated (GitHub scan, markdown upload, etc.)
@@ -1572,24 +1580,14 @@ const UIOverlay = ({
       )}
       {' '}
       {/* Professional top bar — side menu, brand, action buttons, presence info */}
-      <div className="top-bar" onClick={(e) => e.stopPropagation()}>
-        <div className="top-bar-section">
-          <button
-            className="top-bar-menu-button"
-            onClick={handleMenuToggle}
-            aria-label="Toggle menu"
-            title="Menu"
-          >
-            ☰
-          </button>
-          <div className="top-bar-brand" aria-label="Volscape">
-            VOL<span className="brand-accent">SCAPE</span>
-          </div>
-        </div>
-
-        <div className="top-bar-divider" />
-
-        <div className="top-bar-section actions">
+      <TopBar
+        view="space"
+        user={user}
+        onMenuToggle={handleMenuToggle}
+        onLogout={handleLogout}
+        onOpenOrgManager={() => setShowOrgManager(true)}
+        actions={
+          <>
           {(user || trialMode) && (
             <>
               <button
@@ -1826,18 +1824,16 @@ const UIOverlay = ({
               <ObjectSearch />
             </>
           )}
-        </div>
-
-        <div className="top-bar-divider" />
-
-        <div className="top-bar-section">
+          </>
+        }
+        presence={
           <SpacePresenceAvatars
             spaceId={currentSpaceId}
             currentCell={currentCell}
             inline
           />
-        </div>
-      </div>
+        }
+      />
       <RecordingFormatPrompt
         open={recordingFormatOpen}
         onSelect={handleFormatSelect}
@@ -1847,6 +1843,11 @@ const UIOverlay = ({
         open={analysisOpen}
         onClose={() => setAnalysisOpen(false)}
         repoName={currentDiagramRepo?.full_name || currentDiagramRepo?.name || lastScannedUrl}
+      />
+      <OrganizationManager
+        user={user}
+        show={showOrgManager}
+        onClose={() => setShowOrgManager(false)}
       />
       <CodeWorkspace />
       <div className={`sidebar-menu ${menuOpen ? 'open' : ''}`}>

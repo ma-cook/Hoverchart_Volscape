@@ -14,7 +14,7 @@ import { clearAllCellCaches } from '../services/cellObjectCache';
 import { CreateSpacePopup } from './components/CreateSpacePopup';
 import { ShareSpacePopup } from './components/ShareSpacePopup';
 import { SpacesTable } from './components/SpacesTable';
-import LandingTopBar from './components/LandingTopBar';
+import TopBar from '../components/TopBar';
 import { WelcomeOverlay } from './components/WelcomeOverlay';
 import { OrganizationManager } from './components/OrganizationManager';
 import { UpgradePrompt, TIER_LIMITS } from './components/UpgradePrompt';
@@ -119,6 +119,7 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
   const [userOrganizations, setUserOrganizations] = useState([]);
   const [activeOrgMembers, setActiveOrgMembers] = useState([]);
   const [showOrgManager, setShowOrgManager] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pendingInvites, setPendingInvites] = useState([]);
 
   useEffect(() => {
@@ -439,12 +440,35 @@ function LandingApp({ onOpenSpace, onTryWithoutAccount }) {
         onClose={() => setShowOrgManager(false)}
       />
 
-      <LandingTopBar
+      <TopBar
+        view="landing"
         user={user}
+        onMenuToggle={() => setMenuOpen((prev) => !prev)}
         onLogout={handleLogout}
         onOpenOrgManager={() => setShowOrgManager(true)}
         pendingInviteCount={pendingInvites.length}
       />
+
+      <div className={`sidebar-menu ${menuOpen ? 'open' : ''}`}>
+        <div className="menu-content">
+          {user && (
+            <div className="sidebar-org-section">
+              <button
+                className="sidebar-org-button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setShowOrgManager(true);
+                }}
+              >
+                <span>Organization</span>
+                {pendingInvites.length > 0 && (
+                  <span className="sidebar-pending-badge">{pendingInvites.length}</span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {user && (
         <>
